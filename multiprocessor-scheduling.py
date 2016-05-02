@@ -16,10 +16,15 @@ jobs_time = [2, 3, 4, 6, 2, 2]
 
 # cromossome [ nofjobs_in_1, nofjobs_in_2, ... nofjobs_in_m, job1, job2, ..., jobn ]
 
+########################################################################################################################
 # auxiliary function
+########################################################################################################################
 
 def get_jobs_per_machine(individual):
-    return individual[0:number_of_machines]
+    return individual[:number_of_machines]
+
+def get_jobs(individual):
+    return individual[number_of_machines:]
 
 
 def generate_jobs_per_machine_part():
@@ -49,8 +54,15 @@ def generate_chromossome():
     shuffle(jobs)
     return jobs_per_machine + jobs
 
+def fst_part_crossover(parent_1, parent_2):
+    return
 
+def snd_part_crossover(parent_1, parent_2):
+    return
+
+########################################################################################################################
 # problem functions
+########################################################################################################################
 
 def fitness(individual):
     jobs_per_machine = get_jobs_per_machine(individual)
@@ -82,12 +94,25 @@ def initial_generation(population_sz, jobs_time):
 
 
 def reproduce(population, reproduction_rate):
+    individual = 0
+    while individual < len(population):
+        jobs_per_machine_parent_1 = get_jobs_per_machine(population[individual])
+        jobs_per_machine_parent_2 = get_jobs_per_machine(population[individual + 1])
+        jobs_parent_1 = get_jobs(population[individual])
+        jobs_parent_2 = get_jobs(population[individual + 1])
+
+        jobs_per_machine_child = fst_part_crossover(jobs_per_machine_parent_1, jobs_per_machine_parent_2)
+        jobs_child = snd_part_crossover(jobs_per_machine_parent_1, jobs_per_machine_parent_2)
+        child = jobs_per_machine_child + jobs_child
+        individual += 2
     return
 
 
 def mutate(population, mutation_rate):
     return
-
+########################################################################################################################
+# solve
+########################################################################################################################
 
 population = initial_generation(population_sz, jobs_time)
 
@@ -97,5 +122,4 @@ while generation < number_of_generations:
     population = mutate(population, reproduction_rate)
     generation += 1
 
-print list(chunks(jobs_time, 6 / 3))[0]
 print "Finish"
