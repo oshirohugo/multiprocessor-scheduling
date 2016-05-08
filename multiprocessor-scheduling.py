@@ -4,18 +4,17 @@
 from random import randint
 from random import shuffle
 
-from jsonschema.tests.test_jsonschema_test_suite import missing_format
 
-POPULATION_SZ = 10
-REPRODUCTION_RATE = 0.5
-MUTATION_RATE = 0.1
+POPULATION_SZ = 100
+REPRODUCTION_RATE = 0.8
+MUTATION_RATE = 0.2
 NUMBER_OF_GENERATIONS = 1000
 
-NUMBER_OF_MACHINES = 3  # M
-NUMBER_OF_JOBS = 6  # N
+NUMBER_OF_MACHINES = 6  # M
 
 # JOBS = [2, 3, 4, 6, 2, 2]
-JOBS = [(1, 4), (2, 3), (3, 2), (4, 5), (5, 1), (5, 2)]
+# JOBS = [(1, 4.0), (2, 3.0), (3, 2.0), (4, 5.0), (5, 1.0), (6, 2.0)]
+JOBS = [(1, 2.0), (2, 3.0), (3, 4.0), (4, 6.0), (5, 2.0), (6, 2.0)]
 
 
 # cromossome [ nofjobs_in_1, nofjobs_in_2, ... nofjobs_in_m, job1, job2, ..., jobn ]
@@ -23,6 +22,37 @@ JOBS = [(1, 4), (2, 3), (3, 2), (4, 5), (5, 1), (5, 2)]
 ########################################################################################################################
 # auxiliary function
 ########################################################################################################################
+def print_generation(gen):
+    for individual in gen:
+        print individual
+
+
+def print_solution(population, fit_function, n_of_machines):
+    best = select_individuals(population, 1, fit_function)[0]
+    jobs_per_machine = get_jobs_per_machine(best, n_of_machines)
+    jobs = get_jobs(best, n_of_machines)
+
+    machine = 0
+    j = 0
+    while machine < len(jobs_per_machine):
+        print "machine %d: " % (machine + 1),
+        n_of_jobs_in_machine = jobs_per_machine[machine]
+        machine_job = 0
+        total = 0
+        while machine_job < n_of_jobs_in_machine:
+            total += jobs[j + machine_job][1]
+            print str(jobs[j + machine_job]) + " ",
+            machine_job += 1
+        j += machine_job
+        machine += 1
+        print " : %f\n" % total,
+
+
+def print_best_fitness(population, fit_function, n_of_machines):
+    best = select_individuals(population, 1, fit_function)[0]
+    print best,
+    print " : " + str(fitness(best, n_of_machines))
+
 
 def get_jobs_per_machine(individual, n_of_machines):
     return individual[:n_of_machines]
@@ -76,8 +106,41 @@ def crossover_s(a, b):
     return [a, b]
 
 
+def adjust_fst_part(child, parent):
+    correct = sum(parent)
+    test = sum(child)
+
+    if correct == test:
+        return child
+
+    if test < correct:
+        diff = correct - test
+        i = 0
+        while diff != 0:
+            if child[i] < correct:
+                child[i] += 1
+                diff -= 1
+            i += 1
+            if i == len(child):
+                i = 0
+        return child
+
+    # test > correct
+    diff = test - correct
+    i = 0
+    while diff != 0:
+        if child[i] > 0:
+            child[i] -= 1
+            diff -= 1
+        i += 1
+        if i == len(child):
+            i = 0
+    return child
+
+
 def fst_part_crossover(parent_1, parent_2, crossover):
-    return crossover(parent_1, parent_2)
+    children = crossover(parent_1, parent_2)
+    return [adjust_fst_part(child, parent_1) for child in children]
 
 
 def adjust_snd_part(child, parent):
@@ -113,15 +176,15 @@ def fitness(individual, n_of_machines):
 
     # Extract total amount of time in for jobs allocated in each machine
     time_per_machine = []
-    j = 0
+    base = 0
     machine = 0
     while machine < n_of_machines:
         total_time = 0
         job = 0
         while job < jobs_per_machine[machine]:
-            total_time += jobs[j + job][1]
+            total_time += jobs[base + job][1]
             job += 1
-        j = job
+        base += job
 
         time_per_machine.append(total_time)
         machine += 1
@@ -142,17 +205,17 @@ def roulette(population, next_gen_size, fitness_function):
     return
 
 
-def select_individuals(population, next_gen_size, fitness_function):
-    return sorted(population, key=fitness_function)[:next_gen_size]
+def select_individuals(population, next_gen_size, fit_function):
+    return sorted(population, key=fit_function)[:next_gen_size]
 
 
-def reproduce(population, rate, fitness_function, crossover_method, n_of_machines):
+def reproduce(population, rate, fit_function, crossover_method, n_of_machines):
     individual = 0
-    next_gen_size = round(len(population) * rate)
-    selected = select_individuals(population, next_gen_size, fitness_function)
+    next_gen_size = int(round(len(population) * rate))
+    selected = select_individuals(population, next_gen_size, fit_function)
     next_gen = []
 
-    while individual < len(selected):
+    while individual < len(selected) - 1:
         jobs_per_machine_parent_1 = get_jobs_per_machine(selected[individual], n_of_machines)
         jobs_per_machine_parent_2 = get_jobs_per_machine(selected[individual + 1], n_of_machines)
         jobs_per_machine_children = fst_part_crossover(jobs_per_machine_parent_1, jobs_per_machine_parent_2,
@@ -175,11 +238,11 @@ def reproduce(population, rate, fitness_function, crossover_method, n_of_machine
 
 def swap(chromosome):
     chromosome_sz = len(chromosome)
-    i = randint(0, chromosome_sz)
-    j = randint(0, chromosome_sz)
+    i = randint(0, chromosome_sz - 1)
+    j = randint(0, chromosome_sz - 1)
 
     if i == j:
-        j = randint(0, chromosome_sz)
+        j = randint(0, chromosome_sz - 1)
 
     aux = chromosome[i]
     chromosome[i] = chromosome[j]
@@ -194,11 +257,13 @@ def seq_swap(chromosome):
 
 def mutate(pop, mutation_rate, mutation_method, n_of_machines):
     individual = 0
-    mutants_sz = round(mutation_rate * len(pop))
-    selected = select_individuals(pop, mutants_sz, fitness_function)
-    mutant_gen = []
-
+    mutants_sz = int(round(mutation_rate * len(pop)))
+    shuffled_pop = pop
+    shuffle(shuffled_pop)
+    selected = shuffled_pop[:mutants_sz]
     while individual < len(selected):
+        replace_index = pop.index(selected[individual])
+
         jobs_per_machine = get_jobs_per_machine(selected[individual], n_of_machines)
         jobs_per_machine_mutant = mutation_method(jobs_per_machine)
 
@@ -206,10 +271,10 @@ def mutate(pop, mutation_rate, mutation_method, n_of_machines):
         jobs_mutant = mutation_method(jobs)
 
         mutant = jobs_per_machine_mutant + jobs_mutant
-        mutant_gen.append(mutant)
+        pop[replace_index] = mutant
         individual += 1
 
-    return mutant_gen
+    return pop
 
 
 ########################################################################################################################
@@ -224,12 +289,28 @@ CROSSOVER_METHOD = crossover_d
 MUTATION_METHOD = swap
 FITNESS_FUNCTION = fitness_function
 
-population = initial_generation(POPULATION_SZ, JOBS, NUMBER_OF_MACHINES)
-
+old_generation = initial_generation(POPULATION_SZ, JOBS, NUMBER_OF_MACHINES)
 generation = 0
 while generation < NUMBER_OF_GENERATIONS:
-    population = reproduce(population, REPRODUCTION_RATE, FITNESS_FUNCTION, CROSSOVER_METHOD, NUMBER_OF_MACHINES)
-    population = mutate(population, MUTATION_RATE, MUTATION_METHOD, NUMBER_OF_MACHINES)
+    children = reproduce(old_generation, REPRODUCTION_RATE, FITNESS_FUNCTION, CROSSOVER_METHOD, NUMBER_OF_MACHINES)
+    children_after_mutations = mutate(children, MUTATION_RATE, MUTATION_METHOD, NUMBER_OF_MACHINES)
+    # children_after_mutations = children
+
+    # M - N
+    old_new_diff = len(old_generation) - len(children_after_mutations)
+    best_from_old = select_individuals(old_generation, old_new_diff, FITNESS_FUNCTION)
+
+    new_generation = children_after_mutations + best_from_old
+    old_generation = new_generation
+
+    # print_generation(new_generation)
+
+    # print "Generation %d" % generation,
+    # print_best_fitness(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES)
+
     generation += 1
 
-print "Finish"
+
+print "Finish!"
+
+print_solution(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES)
