@@ -10,10 +10,9 @@ REPRODUCTION_RATE = 0.8
 MUTATION_RATE = 0.2
 NUMBER_OF_GENERATIONS = 1000
 
-NUMBER_OF_MACHINES = 6  # M
+NUMBER_OF_MACHINES = 3  # M
 
-# JOBS = [2, 3, 4, 6, 2, 2]
-# JOBS = [(1, 4.0), (2, 3.0), (3, 2.0), (4, 5.0), (5, 1.0), (6, 2.0)]
+''# JOBS = [(1, 4.0), (2, 3.0), (3, 2.0), (4, 5.0), (5, 1.0), (6, 2.0)]
 JOBS = [(1, 2.0), (2, 3.0), (3, 4.0), (4, 6.0), (5, 2.0), (6, 2.0)]
 
 # cromossome [ nofjobs_in_1, nofjobs_in_2, ... nofjobs_in_m, job1, job2, ..., jobn ]
@@ -336,35 +335,62 @@ CROSSOVER_METHOD = crossover_d
 MUTATION_METHOD = seq_swap
 FITNESS_FUNCTION = fitness_function
 SELECTION_METHOD = championship
+ELITISM = True
 
 repetition_counter = 0
 old_generation = initial_generation(POPULATION_SZ, JOBS, NUMBER_OF_MACHINES)
 generation = 0
 last_best = []
-while generation < NUMBER_OF_GENERATIONS:
-    children = reproduce(old_generation, REPRODUCTION_RATE, FITNESS_FUNCTION, CROSSOVER_METHOD, NUMBER_OF_MACHINES,
-                         SELECTION_METHOD)
-    children_after_mutations = mutate(children, MUTATION_RATE, MUTATION_METHOD, NUMBER_OF_MACHINES)
-    # children_after_mutations = children
 
-    # M - N
-    old_new_diff = len(old_generation) - len(children_after_mutations)
-    best_from_old = championship(old_generation, old_new_diff, FITNESS_FUNCTION)
+if not ELITISM:
+    while generation < NUMBER_OF_GENERATIONS:
+        children = reproduce(old_generation, REPRODUCTION_RATE, FITNESS_FUNCTION, CROSSOVER_METHOD, NUMBER_OF_MACHINES,
+                             SELECTION_METHOD)
+        children_after_mutations = mutate(children, MUTATION_RATE, MUTATION_METHOD, NUMBER_OF_MACHINES)
+        # children_after_mutations = children
 
-    new_generation = children_after_mutations + best_from_old
-    old_generation = new_generation
+        # M - N
+        old_new_diff = len(old_generation) - len(children_after_mutations)
+        best_from_old = championship(old_generation, old_new_diff, FITNESS_FUNCTION)
 
-    # print_generation(new_generation)
+        new_generation = children_after_mutations + best_from_old
+        old_generation = new_generation
 
-    print "Generation %d" % generation,
-    print_best_fitness(new_generation, FITNESS_FUNCTION)
-    last_best, repetition_counter = check_repetitions(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES, last_best,
-                                                      repetition_counter)
+        # print_generation(new_generation)
 
-    if repetition_counter == 3:
-        break
+        print "Generation %d" % generation,
+        print_best_fitness(new_generation, FITNESS_FUNCTION)
+        last_best, repetition_counter = check_repetitions(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES, last_best,
+                                                          repetition_counter)
 
-    generation += 1
+        if repetition_counter == 3:
+            break
+
+        generation += 1
+
+
+if ELITISM:
+    while generation < NUMBER_OF_GENERATIONS:
+        best_from_old = championship(old_generation, 1, FITNESS_FUNCTION)
+        children = reproduce(old_generation, REPRODUCTION_RATE, FITNESS_FUNCTION, CROSSOVER_METHOD, NUMBER_OF_MACHINES,
+                             SELECTION_METHOD)
+        children_after_mutations = mutate(children, MUTATION_RATE, MUTATION_METHOD, NUMBER_OF_MACHINES)
+
+        new_generation = children_after_mutations + best_from_old
+        old_generation = new_generation
+
+        # print_generation(new_generation)
+
+        print "Generation %d" % generation,
+        print_best_fitness(new_generation, FITNESS_FUNCTION)
+        last_best, repetition_counter = check_repetitions(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES, last_best,
+                                                          repetition_counter)
+
+        if repetition_counter == 3:
+            break
+
+        generation += 1
+
 
 print "Finish!"
 
