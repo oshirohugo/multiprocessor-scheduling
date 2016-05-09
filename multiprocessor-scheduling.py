@@ -2,8 +2,8 @@
 # Problem defined here http://otfried.org/courses/cs500/slides-approx.pdf
 
 from random import randint
+from random import uniform
 from random import shuffle
-
 
 POPULATION_SZ = 100
 REPRODUCTION_RATE = 0.8
@@ -16,7 +16,6 @@ NUMBER_OF_MACHINES = 6  # M
 # JOBS = [(1, 4.0), (2, 3.0), (3, 2.0), (4, 5.0), (5, 1.0), (6, 2.0)]
 JOBS = [(1, 2.0), (2, 3.0), (3, 4.0), (4, 6.0), (5, 2.0), (6, 2.0)]
 
-
 # cromossome [ nofjobs_in_1, nofjobs_in_2, ... nofjobs_in_m, job1, job2, ..., jobn ]
 
 ########################################################################################################################
@@ -28,7 +27,7 @@ def print_generation(gen):
 
 
 def print_solution(population, fit_function, n_of_machines):
-    best = select_individuals(population, 1, fit_function)[0]
+    best = championship(population, 1, fit_function)[0]
     jobs_per_machine = get_jobs_per_machine(best, n_of_machines)
     jobs = get_jobs(best, n_of_machines)
 
@@ -48,10 +47,21 @@ def print_solution(population, fit_function, n_of_machines):
         print " : %f\n" % total,
 
 
-def print_best_fitness(population, fit_function, n_of_machines):
-    best = select_individuals(population, 1, fit_function)[0]
+def print_best_fitness(population, fit_function):
+    best = championship(population, 1, fit_function)[0]
     print best,
-    print " : " + str(fitness(best, n_of_machines))
+    print " : " + str(fit_function(best))
+
+
+def check_repetitions(population, fit_function, n_of_machines, last, repetition):
+    best = championship(population, 1, fit_function)[0]
+
+    if not last:
+        return best, 0
+
+    if best == last:
+        return best, repetition + 1
+    return best, 0
 
 
 def get_jobs_per_machine(individual, n_of_machines):
@@ -98,12 +108,14 @@ def crossover_d(a, b):
 
 
 def crossover_s(a, b):
-    i_a = randint(0, len(a))
-    i_b = randint(0, len(a))
-    aux = a[i_a]
-    a[i_a] = b[i_b]
-    b[i_b] = aux
-    return [a, b]
+    aa = list(a)
+    bb = list(b)
+    i_a = randint(0, len(a) - 1)
+    i_b = randint(0, len(b) - 1)
+    aux = aa[i_a]
+    aa[i_a] = bb[i_b]
+    bb[i_b] = aux
+    return [aa, bb]
 
 
 def adjust_fst_part(child, parent):
@@ -139,8 +151,8 @@ def adjust_fst_part(child, parent):
 
 
 def fst_part_crossover(parent_1, parent_2, crossover):
-    children = crossover(parent_1, parent_2)
-    return [adjust_fst_part(child, parent_1) for child in children]
+    _children = crossover(parent_1, parent_2)
+    return [adjust_fst_part(child, parent_1) for child in _children]
 
 
 def adjust_snd_part(child, parent):
@@ -178,6 +190,7 @@ def fitness(individual, n_of_machines):
     time_per_machine = []
     base = 0
     machine = 0
+    unused = 0
     while machine < n_of_machines:
         total_time = 0
         job = 0
@@ -187,9 +200,16 @@ def fitness(individual, n_of_machines):
         base += job
 
         time_per_machine.append(total_time)
+
+        if jobs_per_machine[machine] == 0:
+            unused += 1
+
         machine += 1
 
-    return max(time_per_machine)
+
+
+    unused = float(unused)
+    return max(time_per_machine) + unused
 
 
 def initial_generation(pop_sz, jobs, n_of_machines):
@@ -201,18 +221,45 @@ def initial_generation(pop_sz, jobs, n_of_machines):
     return initial_population
 
 
-def roulette(population, next_gen_size, fitness_function):
-    return
+def accumu(lis):
+    total = 0
+    for x in lis:
+        total += x
+        yield total
 
 
-def select_individuals(population, next_gen_size, fit_function):
+def select_by_fitness(r, fit_sum):
+    for i in range(len(fit_sum)):
+        if fit_sum >= r:
+            return i
+    # Should never get here
+    return -1
+
+
+def roulette(population, next_gen_size, fit_function):
+    all_elements_fit = [fit_function(chromosome) for chromosome in population]
+    a_t = sum(all_elements_fit)
+    fit_sum = list(accumu(all_elements_fit))
+
+    next_pop = []
+    elements = 0
+    while elements < next_gen_size:
+        r = uniform(0, a_t)
+        selected_index = select_by_fitness(r, fit_sum)
+        next_pop.append(population[selected_index])
+        elements += 1
+
+    return next_pop
+
+
+def championship(population, next_gen_size, fit_function):
     return sorted(population, key=fit_function)[:next_gen_size]
 
 
-def reproduce(population, rate, fit_function, crossover_method, n_of_machines):
+def reproduce(population, rate, fit_function, crossover_method, n_of_machines, selection_method):
     individual = 0
     next_gen_size = int(round(len(population) * rate))
-    selected = select_individuals(population, next_gen_size, fit_function)
+    selected = selection_method(population, next_gen_size, fit_function)
     next_gen = []
 
     while individual < len(selected) - 1:
@@ -258,7 +305,7 @@ def seq_swap(chromosome):
 def mutate(pop, mutation_rate, mutation_method, n_of_machines):
     individual = 0
     mutants_sz = int(round(mutation_rate * len(pop)))
-    shuffled_pop = pop
+    shuffled_pop = list(pop)
     shuffle(shuffled_pop)
     selected = shuffled_pop[:mutants_sz]
     while individual < len(selected):
@@ -286,30 +333,38 @@ def fitness_function(individual):
 
 
 CROSSOVER_METHOD = crossover_d
-MUTATION_METHOD = swap
+MUTATION_METHOD = seq_swap
 FITNESS_FUNCTION = fitness_function
+SELECTION_METHOD = championship
 
+repetition_counter = 0
 old_generation = initial_generation(POPULATION_SZ, JOBS, NUMBER_OF_MACHINES)
 generation = 0
+last_best = []
 while generation < NUMBER_OF_GENERATIONS:
-    children = reproduce(old_generation, REPRODUCTION_RATE, FITNESS_FUNCTION, CROSSOVER_METHOD, NUMBER_OF_MACHINES)
+    children = reproduce(old_generation, REPRODUCTION_RATE, FITNESS_FUNCTION, CROSSOVER_METHOD, NUMBER_OF_MACHINES,
+                         SELECTION_METHOD)
     children_after_mutations = mutate(children, MUTATION_RATE, MUTATION_METHOD, NUMBER_OF_MACHINES)
     # children_after_mutations = children
 
     # M - N
     old_new_diff = len(old_generation) - len(children_after_mutations)
-    best_from_old = select_individuals(old_generation, old_new_diff, FITNESS_FUNCTION)
+    best_from_old = championship(old_generation, old_new_diff, FITNESS_FUNCTION)
 
     new_generation = children_after_mutations + best_from_old
     old_generation = new_generation
 
     # print_generation(new_generation)
 
-    # print "Generation %d" % generation,
-    # print_best_fitness(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES)
+    print "Generation %d" % generation,
+    print_best_fitness(new_generation, FITNESS_FUNCTION)
+    last_best, repetition_counter = check_repetitions(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES, last_best,
+                                                      repetition_counter)
+
+    if repetition_counter == 3:
+        break
 
     generation += 1
-
 
 print "Finish!"
 
