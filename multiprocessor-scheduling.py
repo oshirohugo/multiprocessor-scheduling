@@ -5,21 +5,31 @@ from random import randint
 from random import uniform
 from random import shuffle
 
-POPULATION_SZ = 100
-REPRODUCTION_RATE = 0.8
-MUTATION_RATE = 0.2
-NUMBER_OF_GENERATIONS = 1000
 
-NUMBER_OF_MACHINES = 3  # M
+# JOBS = [(1, 4.0), (2, 3.0), (3, 2.0), (4, 5.0), (5, 1.0), (6, 2.0)]
+# JOBS = [(1, 2.0), (2, 3.0), (3, 4.0), (4, 6.0), (5, 2.0), (6, 2.0)]
 
-''# JOBS = [(1, 4.0), (2, 3.0), (3, 2.0), (4, 5.0), (5, 1.0), (6, 2.0)]
-JOBS = [(1, 2.0), (2, 3.0), (3, 4.0), (4, 6.0), (5, 2.0), (6, 2.0)]
 
 # cromossome [ nofjobs_in_1, nofjobs_in_2, ... nofjobs_in_m, job1, job2, ..., jobn ]
 
 ########################################################################################################################
 # auxiliary function
 ########################################################################################################################
+def read_jobs_from_file(file_name):
+    jobs = []
+    job_id = 1
+    with open(file_name, "r") as f:
+        for line in f:
+            jobs.append((job_id, float(line)))
+            job_id += 1
+    return jobs
+
+
+def print_fitness_to_file(gen, population, fit_function, f):
+    best = championship(population, 1, fit_function)[0]
+    f.write(str(gen) + ";" + str(fit_function(best)) + "\n")
+
+
 def print_generation(gen):
     for individual in gen:
         print individual
@@ -43,12 +53,12 @@ def print_solution(population, fit_function, n_of_machines):
             machine_job += 1
         j += machine_job
         machine += 1
-        print " : %f\n" % total,
+        print " : %.2f\n" % total,
 
 
 def print_best_fitness(population, fit_function):
     best = championship(population, 1, fit_function)[0]
-    print best,
+    # print best,
     print " : " + str(fit_function(best))
 
 
@@ -100,7 +110,7 @@ def generate_chromossome(jobs, n_of_machines):
 
 
 def crossover_d(a, b):
-    cut_point = len(a) / 2
+    cut_point = randint(1, len(a) - 1)
     aa = a[:cut_point] + b[cut_point:]
     bb = b[:cut_point] + a[cut_point:]
     return [aa, bb]
@@ -204,8 +214,6 @@ def fitness(individual, n_of_machines):
             unused += 1
 
         machine += 1
-
-
 
     unused = float(unused)
     return max(time_per_machine) + unused
@@ -331,11 +339,22 @@ def fitness_function(individual):
     return fitness(individual, NUMBER_OF_MACHINES)
 
 
-CROSSOVER_METHOD = crossover_d
-MUTATION_METHOD = seq_swap
+JOBS_FILE = "loading-balance-1000.txt"
+OUTPUT_FILE = open("output-1000.txt", "w")
+
+JOBS = read_jobs_from_file(JOBS_FILE)
+
+POPULATION_SZ = 500
+REPRODUCTION_RATE = 0.9
+MUTATION_RATE = 0.1
+NUMBER_OF_GENERATIONS = 10000
+NUMBER_OF_MACHINES = 15  # M
+
+CROSSOVER_METHOD = crossover_s
+MUTATION_METHOD = swap
 FITNESS_FUNCTION = fitness_function
 SELECTION_METHOD = championship
-ELITISM = True
+ELITISM = False
 
 repetition_counter = 0
 old_generation = initial_generation(POPULATION_SZ, JOBS, NUMBER_OF_MACHINES)
@@ -347,7 +366,6 @@ if not ELITISM:
         children = reproduce(old_generation, REPRODUCTION_RATE, FITNESS_FUNCTION, CROSSOVER_METHOD, NUMBER_OF_MACHINES,
                              SELECTION_METHOD)
         children_after_mutations = mutate(children, MUTATION_RATE, MUTATION_METHOD, NUMBER_OF_MACHINES)
-        # children_after_mutations = children
 
         # M - N
         old_new_diff = len(old_generation) - len(children_after_mutations)
@@ -360,14 +378,15 @@ if not ELITISM:
 
         print "Generation %d" % generation,
         print_best_fitness(new_generation, FITNESS_FUNCTION)
-        last_best, repetition_counter = check_repetitions(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES, last_best,
+        print_fitness_to_file(generation, new_generation, FITNESS_FUNCTION, OUTPUT_FILE)
+        last_best, repetition_counter = check_repetitions(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES,
+                                                          last_best,
                                                           repetition_counter)
 
-        if repetition_counter == 3:
-            break
+        # if repetition_counter == 3:
+        #     break
 
         generation += 1
-
 
 if ELITISM:
     while generation < NUMBER_OF_GENERATIONS:
@@ -383,15 +402,17 @@ if ELITISM:
 
         print "Generation %d" % generation,
         print_best_fitness(new_generation, FITNESS_FUNCTION)
-        last_best, repetition_counter = check_repetitions(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES, last_best,
+        print_fitness_to_file(generation, new_generation, FITNESS_FUNCTION, OUTPUT_FILE)
+        last_best, repetition_counter = check_repetitions(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES,
+                                                          last_best,
                                                           repetition_counter)
 
-        if repetition_counter == 3:
-            break
+        # if repetition_counter == 3:
+        #     break
 
         generation += 1
 
-
 print "Finish!"
 
+OUTPUT_FILE.close()
 print_solution(new_generation, FITNESS_FUNCTION, NUMBER_OF_MACHINES)
