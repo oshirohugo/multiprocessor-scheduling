@@ -26,8 +26,11 @@ def read_jobs_from_file(file_name):
 
 
 def print_fitness_to_file(gen, population, fit_function, f):
-    best = championship(population, 1, fit_function)[0]
-    f.write(str(gen) + ";" + str(fit_function(best)) + "\n")
+    # best = championship(population, 1, fit_function)[0]
+    all_fitness = [fit_function(individual) for individual in population]
+    mean_fit = sum(all_fitness) / len(all_fitness)
+    # f.write(str(gen) + ";" + str(fit_function(best)) + ";" + str(mean_fit) + "\n")
+    f.write(str(gen) + ";" + str(mean_fit) + "\n")
 
 
 def print_generation(gen):
@@ -58,7 +61,6 @@ def print_solution(population, fit_function, n_of_machines):
 
 def print_best_fitness(population, fit_function):
     best = championship(population, 1, fit_function)[0]
-    # print best,
     print " : " + str(fit_function(best))
 
 
@@ -340,14 +342,14 @@ def fitness_function(individual):
 
 
 JOBS_FILE = "loading-balance-1000.txt"
-OUTPUT_FILE = open("output-1000.txt", "w")
+OUTPUT_FILE = open("complete-output-7.txt", "w")
 
 JOBS = read_jobs_from_file(JOBS_FILE)
 
 POPULATION_SZ = 500
 REPRODUCTION_RATE = 0.9
-MUTATION_RATE = 0.1
-NUMBER_OF_GENERATIONS = 10000
+MUTATION_RATE = 0.9
+NUMBER_OF_GENERATIONS = 500
 NUMBER_OF_MACHINES = 15  # M
 
 CROSSOVER_METHOD = crossover_s
